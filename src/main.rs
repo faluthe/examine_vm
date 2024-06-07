@@ -21,11 +21,11 @@ fn main() -> eframe::Result<()> {
 
 pub struct XApp {
     memory_address: String,
-    start_address: Option<u64>,
+    start_address: Option<usize>,
     validation_message: String,
-    num_addresses: u64,
+    num_addresses: usize,
     pid: String,
-    data: Vec<[u8; 4]>,
+    data32: Vec<i32>,
     last_update: Instant,
     update_interval: Duration,
 }
@@ -38,7 +38,7 @@ impl Default for XApp {
             validation_message: String::new(),
             num_addresses: 10,
             pid: String::from(""),
-            data: Vec::new(),
+            data32: Vec::new(),
             last_update: Instant::now(),
             update_interval: Duration::from_secs(1),
         }
@@ -83,7 +83,7 @@ impl eframe::App for XApp {
             ui.add(Slider::new(&mut self.num_addresses, 1..=500).text("Addresses"));
 
             if self.memory_address.starts_with("0x") && self.memory_address.len() >= 8 {
-                match u64::from_str_radix(&self.memory_address[2..], 16) {
+                match usize::from_str_radix(&self.memory_address[2..], 16) {
                     Ok(address) => {
                         self.start_address = Some(address);
                         self.validation_message = "Valid memory address".to_string();
@@ -106,22 +106,21 @@ impl eframe::App for XApp {
                 let now = Instant::now();
                 if now.duration_since(self.last_update) >= self.update_interval {
                     self.last_update = now;
-                    let num_addresses = self.num_addresses as usize;
-                    let mut local_iov = Vec::with_capacity(num_addresses);
-                    for _ in 0..num_addresses {
-                        local_iov.push(IoSliceMut::new(&mut [0u8; 4]));
+                    let pid = Pid::from_raw(self.pid.parse().unwrap());
+                    let mut data = vec![0u8; self.num_addresses as usize * 4];
+                    let local_iov = IoSliceMut::new(&mut data);
+                    let remote_iov = RemoteIoVec {
+                        base: address,
+                        len: self.num_addresses as usize * 4,
+                    };
+                    match process_vm_readv(pid, &mut [local_iov], &[remote_iov]) {
+                        Ok(_) => {
+                            self.data32 = data.chunks_exact(4).map(|chunk| {
+                                i32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+                            }).collect();
+                        },
+                        Err(_) => self.data32.clear(),
                     }
-
-                    let mut remote_iov = Vec::with_capacity(num_addresses);
-                    for i in 0..num_addresses {
-                        remote_iov.push(RemoteIoVec{
-                            base: address + i as u64 * 4,
-                            len: 4,
-                        });
-                    }
-
-                    let pid = self.pid.parse::<i32>().unwrap();
-                    process_vm_readv(Pid::from_raw(pid), &mut local_iov, &mut remote_iov, 0).unwrap();
                 }
 
                 ui.label("Memory Address Table:");
@@ -137,11 +136,11 @@ impl eframe::App for XApp {
                         for i in 0..self.num_addresses {
                             ui.label(format!("0x{:X}", address + i * 4));
                             // unsafe?
-                            let hex32 = u32::from_ne_bytes(self.data[i as usize]);
+                            let hex32 = self.data32[i];
                             ui.label(format!("0x{:X}", hex32));
                             ui.label(format!("{}", hex32));
                             // useless rn
-                            let hex64 = u32::from_ne_bytes(self.data[i as usize]);
+                            let hex64 = self.data32[i] as i64;
                             ui.label(format!("0x{:X}", hex64));
                             ui.end_row();
                         }
