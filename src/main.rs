@@ -59,6 +59,7 @@ impl XApp {
 
 impl eframe::App for XApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        ctx.set_pixels_per_point(2.0);
         ctx.request_repaint();
         TopBottomPanel::top("top_panel").show(ctx, |ui| {
             menu::bar(ui, |ui| {
@@ -77,6 +78,7 @@ impl eframe::App for XApp {
         if self.show_attach_popup {
             Window::new("Enter Process ID")
                 .collapsible(false)
+                .resizable(false)
                 .show(ctx, |ui| {
                     ui.label("Enter process ID:");
                     let response = ui.add(TextEdit::singleline(&mut self.popup_pid));
