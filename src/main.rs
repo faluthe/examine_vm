@@ -59,7 +59,7 @@ impl XApp {
 
 impl eframe::App for XApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        ctx.set_pixels_per_point(2.0);
+        ctx.set_pixels_per_point(1.3);
         ctx.request_repaint();
         TopBottomPanel::top("top_panel").show(ctx, |ui| {
             menu::bar(ui, |ui| {
