@@ -135,12 +135,12 @@ impl eframe::App for XApp {
 
                         for i in 0..self.num_addresses {
                             ui.label(format!("0x{:X}", address + i * 4));
-                            // unsafe?
-                            let hex32 = self.data32[i];
+                            // Todo: make this safe
+                            let hex32 = self.data32.get(i).unwrap_or(&0);
                             ui.label(format!("0x{:X}", hex32));
                             ui.label(format!("{}", hex32));
                             // useless rn
-                            let hex64 = self.data32[i] as i64;
+                            let hex64 = self.data32.get(i).unwrap_or(&0);
                             ui.label(format!("0x{:X}", hex64));
                             ui.end_row();
                         }
