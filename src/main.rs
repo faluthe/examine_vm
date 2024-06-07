@@ -2,7 +2,7 @@ use std::{io::IoSliceMut, time::{Duration, Instant}};
 
 use nix::{sys::uio::{RemoteIoVec, process_vm_readv}, unistd::Pid};
 
-use egui::{menu, CentralPanel, Context, Grid, ScrollArea, Slider, TextEdit, TopBottomPanel, ViewportBuilder, ViewportCommand};
+use egui::{menu, CentralPanel, Context, Grid, Key, ScrollArea, Slider, TextEdit, TopBottomPanel, ViewportBuilder, ViewportCommand, Window};
 
 fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
@@ -28,6 +28,7 @@ pub struct XApp {
     data32: Vec<i32>,
     last_update: Instant,
     update_interval: Duration,
+    show_attach_popup: bool,
 }
 
 impl Default for XApp {
@@ -41,6 +42,7 @@ impl Default for XApp {
             data32: Vec::new(),
             last_update: Instant::now(),
             update_interval: Duration::from_millis(350),
+            show_attach_popup: false,
         }
     }
 }
@@ -59,6 +61,9 @@ impl eframe::App for XApp {
         TopBottomPanel::top("top_panel").show(ctx, |ui| {
             menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
+                    if ui.button("Attach").clicked() {
+                        self.show_attach_popup = true;
+                    }
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(ViewportCommand::Close);
                     }
@@ -66,18 +71,29 @@ impl eframe::App for XApp {
             });
         });
 
+        if self.show_attach_popup {
+            Window::new("Enter Process ID")
+                .collapsible(false)
+                .show(ctx, |ui| {
+                    ui.label("Enter process ID:");
+                    let mut input_value = String::new();
+                    let response = ui.add(TextEdit::singleline(&mut input_value));
+
+                    if response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+                        self.pid = input_value;
+                        self.show_attach_popup = false;
+                    }
+                });
+        }
+
         CentralPanel::default().show(ctx, |ui| {
+            let pid_label = format!("PID: {}", self.pid);
+            ui.label(pid_label);
+
             ui.label("Enter memory address (e.g., 0xd34db33f):");
             ui.add(
                 TextEdit::singleline(&mut self.memory_address)
                     .hint_text("0xd34db33f")
-                    .desired_width(200.0),
-            );
-
-            ui.label("Enter process ID:");
-            ui.add(
-                TextEdit::singleline(&mut self.pid)
-                    .hint_text("1234")
                     .desired_width(200.0),
             );
 
@@ -143,6 +159,7 @@ impl eframe::App for XApp {
                             // useless rn
                             let hex64 = self.data32.get(i).unwrap_or(&0);
                             ui.label(format!("0x{:X}", hex64));
+                            ui.label(format!("{}", hex64));
                             ui.end_row();
                         }
                     });
