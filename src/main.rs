@@ -84,7 +84,11 @@ impl eframe::App for XApp {
                     let response = ui.add(TextEdit::singleline(&mut self.popup_pid));
 
                     if response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-                        self.pid = Some(self.popup_pid.clone());
+                        if self.popup_pid.is_empty() {
+                            self.pid = None;
+                        } else {
+                            self.pid = Some(self.popup_pid.clone());
+                        }
                         self.show_attach_popup = false;
                     }
                 });
