@@ -24,7 +24,7 @@ pub struct XApp {
     start_address: Option<usize>,
     validation_message: String,
     num_addresses: usize,
-    pid: String,
+    pid: Option<String>,
     data32: Vec<i32>,
     last_update: Instant,
     update_interval: Duration,
@@ -39,7 +39,7 @@ impl Default for XApp {
             start_address: None,
             validation_message: String::new(),
             num_addresses: 10,
-            pid: String::from("95392"),
+            pid: None,
             data32: Vec::new(),
             last_update: Instant::now(),
             update_interval: Duration::from_millis(350),
@@ -84,14 +84,14 @@ impl eframe::App for XApp {
                     let response = ui.add(TextEdit::singleline(&mut self.popup_pid));
 
                     if response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-                        self.pid = self.popup_pid.clone();
+                        self.pid = Some(self.popup_pid.clone());
                         self.show_attach_popup = false;
                     }
                 });
         }
 
         CentralPanel::default().show(ctx, |ui| {
-            let pid_label = format!("PID: {}", self.pid);
+            let pid_label = format!("PID: {}", self.pid.as_deref().unwrap_or("None"));
             ui.label(pid_label);
 
             ui.label("Enter memory address (e.g., 0xd34db33f):");
@@ -125,22 +125,24 @@ impl eframe::App for XApp {
                 ui.separator();
 
                 let now = Instant::now();
-                if now.duration_since(self.last_update) >= self.update_interval {
-                    self.last_update = now;
-                    let pid = Pid::from_raw(self.pid.parse().unwrap());
-                    let mut data = vec![0u8; self.num_addresses as usize * 4];
-                    let local_iov = IoSliceMut::new(&mut data);
-                    let remote_iov = RemoteIoVec {
-                        base: address,
-                        len: self.num_addresses as usize * 4,
-                    };
-                    match process_vm_readv(pid, &mut [local_iov], &[remote_iov]) {
-                        Ok(_) => {
-                            self.data32 = data.chunks_exact(4).map(|chunk| {
-                                i32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
-                            }).collect();
-                        },
-                        Err(_) => self.data32.clear(),
+                if let Some(pid) = &self.pid {
+                    if now.duration_since(self.last_update) >= self.update_interval {
+                        self.last_update = now;
+                        let pid = Pid::from_raw(pid.parse().unwrap());
+                        let mut data = vec![0u8; self.num_addresses as usize * 4];
+                        let local_iov = IoSliceMut::new(&mut data);
+                        let remote_iov = RemoteIoVec {
+                            base: address,
+                            len: self.num_addresses as usize * 4,
+                        };
+                        match process_vm_readv(pid, &mut [local_iov], &[remote_iov]) {
+                            Ok(_) => {
+                                self.data32 = data.chunks_exact(4).map(|chunk| {
+                                    i32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+                                }).collect();
+                            },
+                            Err(_) => self.data32.clear(),
+                        }
                     }
                 }
 
