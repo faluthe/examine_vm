@@ -29,6 +29,7 @@ pub struct XApp {
     last_update: Instant,
     update_interval: Duration,
     show_attach_popup: bool,
+    popup_pid: String,
 }
 
 impl Default for XApp {
@@ -43,6 +44,7 @@ impl Default for XApp {
             last_update: Instant::now(),
             update_interval: Duration::from_millis(350),
             show_attach_popup: false,
+            popup_pid: String::new(),
         }
     }
 }
@@ -63,6 +65,7 @@ impl eframe::App for XApp {
                 ui.menu_button("File", |ui| {
                     if ui.button("Attach").clicked() {
                         self.show_attach_popup = true;
+                        ui.close_menu();
                     }
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(ViewportCommand::Close);
@@ -76,11 +79,10 @@ impl eframe::App for XApp {
                 .collapsible(false)
                 .show(ctx, |ui| {
                     ui.label("Enter process ID:");
-                    let mut input_value = String::new();
-                    let response = ui.add(TextEdit::singleline(&mut input_value));
+                    let response = ui.add(TextEdit::singleline(&mut self.popup_pid));
 
                     if response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-                        self.pid = input_value;
+                        self.pid = self.popup_pid.clone();
                         self.show_attach_popup = false;
                     }
                 });
