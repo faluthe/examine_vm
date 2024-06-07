@@ -37,10 +37,10 @@ impl Default for XApp {
             start_address: None,
             validation_message: String::new(),
             num_addresses: 10,
-            pid: String::from("95119"),
+            pid: String::from("95392"),
             data32: Vec::new(),
             last_update: Instant::now(),
-            update_interval: Duration::from_secs(1),
+            update_interval: Duration::from_millis(350),
         }
     }
 }
