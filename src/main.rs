@@ -25,8 +25,11 @@ pub struct XApp {
     validation_message: String,
     num_addresses: usize,
     pid: Option<String>,
+    datachar: Vec<char>,
     data32: Vec<i32>,
+    data64: Vec<i64>,
     last_update: Instant,
+    update_interval_ms: u64,
     update_interval: Duration,
     show_attach_popup: bool,
     popup_pid: String,
@@ -40,8 +43,11 @@ impl Default for XApp {
             validation_message: String::new(),
             num_addresses: 10,
             pid: None,
+            datachar: Vec::new(),
             data32: Vec::new(),
+            data64: Vec::new(),
             last_update: Instant::now(),
+            update_interval_ms: 350,
             update_interval: Duration::from_millis(350),
             show_attach_popup: false,
             popup_pid: String::new(),
@@ -105,7 +111,9 @@ impl eframe::App for XApp {
                     .desired_width(200.0),
             );
 
-            ui.add(Slider::new(&mut self.num_addresses, 1..=500).text("Addresses"));
+            ui.add(Slider::new(&mut self.num_addresses, 1..=2000).text("Addresses"));
+            ui.add(Slider::new(&mut self.update_interval_ms, 10..=1000).text("Update Interval (ms)"));
+            self.update_interval = Duration::from_millis(self.update_interval_ms);
 
             if self.memory_address.starts_with("0x") && self.memory_address.len() >= 8 {
                 match usize::from_str_radix(&self.memory_address[2..], 16) {
@@ -141,11 +149,17 @@ impl eframe::App for XApp {
                         };
                         match process_vm_readv(pid, &mut [local_iov], &[remote_iov]) {
                             Ok(_) => {
+                                self.datachar = data.iter().map(|&c| c as char).collect();
                                 self.data32 = data.chunks_exact(4).map(|chunk| {
                                     i32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
                                 }).collect();
+                                self.data64 = data.chunks_exact(8).map(|chunk| {
+                                    i64::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7]])
+                                }).collect();
                             },
-                            Err(_) => self.data32.clear(),
+                            Err(_) => {
+                                self.data32.clear()
+                            },
                         }
                     }
                 }
@@ -156,8 +170,9 @@ impl eframe::App for XApp {
                         ui.label("Address");
                         ui.label("Hex32");
                         ui.label("Dec32");
+                        ui.label("Float32");
                         ui.label("Hex64");
-                        ui.label("Dec64");
+                        ui.label("String");
                         ui.end_row();
 
                         for i in 0..self.num_addresses {
@@ -166,10 +181,15 @@ impl eframe::App for XApp {
                             let hex32 = self.data32.get(i).unwrap_or(&0);
                             ui.label(format!("0x{:X}", hex32));
                             ui.label(format!("{}", hex32));
-                            // useless rn
-                            let hex64 = self.data32.get(i).unwrap_or(&0);
-                            ui.label(format!("0x{:X}", hex64));
-                            ui.label(format!("{}", hex64));
+                            ui.label(format!("{}", f32::from_ne_bytes(hex32.to_ne_bytes())));
+                            if i % 2 == 0 {
+                                let hex64 = self.data64.get(i / 2).unwrap_or(&0);
+                                ui.label(format!("0x{:X}", hex64));
+                            } else {
+                                ui.label("");
+                            }
+                            // let string: String = self.datachar.iter().skip(i * 4).take(4).collect();
+                            ui.label("");
                             ui.end_row();
                         }
                     });
